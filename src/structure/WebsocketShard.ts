@@ -1,5 +1,6 @@
 // A port of @discordjs/ws websocket shard code to make it work with Websocket.ts
 // Original code at https://github.com/discordjs/discord.js/blob/main/packages/ws/src/ws/WebSocketShard.ts
+
 import { once } from 'node:events';
 import { clearInterval, clearTimeout, setInterval, setTimeout } from 'node:timers';
 import { setTimeout as sleep } from 'node:timers/promises';
