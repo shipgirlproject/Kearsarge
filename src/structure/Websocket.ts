@@ -60,6 +60,7 @@ export class Websocket extends EventEmitter {
             closePromise: null,
             zlib: null,
         };
+        this.emit('debug', 'Note: Using a custom websocket connection, if there are any issues let me know at https://github.com/Deivu/Kearsarge/issues');
     }
 
     public connect(address: string): Promise<void> {
