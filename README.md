@@ -5,6 +5,8 @@
     <img src="https://azurlane.netojuu.com/images/6/64/KearsargeWithoutBG.png"> 
 </p>
 
+> The ShipGirl Project, feat Kearsarge; ⓒ Azur Lane
+
 ### Notes
 
 * Uses mixed code between [@discordjs/ws](https://github.com/discordjs/discord.js/tree/main/packages/ws) and [CloudStorm](https://github.com/DasWolke/CloudStorm/tree/master)
