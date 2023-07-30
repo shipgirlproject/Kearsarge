@@ -1,0 +1,51 @@
+{
+  "name": "kearsarge",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:ts && npm run build:docs",
+    "build:ts": "tsup --config tsup-config.json",
+    "build:docs": "typedoc --theme default --readme README.md --out docs/ --entryPointStrategy expand src/.",
+    "lint": "eslint . --ext .ts --fix",
+    "prepare": "npm run build:ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Deivu/Kearsarge.git"
+  },
+  "author": "Deivu (Saya)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Deivu/Kearsarge/issues"
+  },
+  "homepage": "https://github.com/Deivu/Kearsarge#readme",
+  "dependencies": {
+    "@discordjs/collection": "^1.5.1",
+    "@discordjs/ws": "^0.8.3",
+    "@sapphire/async-queue": "^1.5.0",
+    "@vladfrangu/async_event_emitter": "^2.2.2",
+    "discord-api-types": "^0.37.50"
+  },
+  "devDependencies": {
+    "@augu/eslint-config": "^4.0.1",
+    "@types/node": "^20.3.1",
+    "@types/ws": "^8.5.5",
+    "@typescript-eslint/eslint-plugin": "^5.60.0",
+    "@typescript-eslint/parser": "^5.60.0",
+    "eslint": "^8.43.0",
+    "tsup": "^7.0.0",
+    "typedoc": "^0.24.8",
+    "typescript": "^5.1.3"
+  }
+}
