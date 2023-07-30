@@ -1,6 +1,6 @@
 ## Kearsarge
 
-> An alternative set of strategies for [@discordjs/ws](https://github.com/discordjs/discord.js/tree/main/packages/ws)
+> An alternative set of strategies for [@discordjs/ws](https://github.com/discordjs/discord.js/tree/main/packages/ws) using [CloudStorm](https://github.com/DasWolke/CloudStorm/tree/master)
 <p align="center">
     <img src="https://azurlane.netojuu.com/images/4/46/Kearsarge.png"> 
 </p>
