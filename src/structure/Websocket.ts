@@ -3,13 +3,13 @@
 // A major thank you to Tim for better performing software.
 // The original TS code is taken from: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type { GatewayReceivePayload, GatewaySendPayload } from 'discord-api-types/v10';
+import type {GatewayReceivePayload, GatewaySendPayload} from 'discord-api-types/v10';
 import type Net from 'node:net';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { EventEmitter } from 'node:events';
-import { createHash, randomBytes } from 'node:crypto';
-import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
-import { WebsocketEncoding, WebsocketStatus } from '../Constants';
+import {setTimeout as sleep} from 'node:timers/promises';
+import {EventEmitter} from 'node:events';
+import {createHash, randomBytes} from 'node:crypto';
+import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
+import {WebsocketEncoding, WebsocketStatus} from '../Constants';
 import Https from 'https';
 import Http from 'http';
 import Util from 'util';
@@ -129,7 +129,6 @@ export class Websocket extends EventEmitter {
     }
 
     public close(code: number, reason?: string): Promise<void> {
-        this.status = WebsocketStatus.CLOSING;
         const internal = this._internal;
         if (internal.closePromise) return internal.closePromise;
         if (!this._socket) return Promise.resolve(void 0);
@@ -144,6 +143,7 @@ export class Websocket extends EventEmitter {
         // @ts-ignore
         promise.resolve = resolver;
         internal.closePromise = promise;
+        this.status = WebsocketStatus.CLOSING;
         return promise;
     }
 
