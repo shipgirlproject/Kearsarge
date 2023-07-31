@@ -1,5 +1,3 @@
-import { GatewayReceivePayload, GatewaySendPayload } from 'discord-api-types/v10';
-
 export enum WebsocketStatus {
     OPEN,
     CONNECTING,
