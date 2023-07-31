@@ -1,83 +1,88 @@
 // This ultra lightweight WS code is a slimmed down version originally found at https://github.com/timotejroiko/tiny-discord
 // Modifications and use of this code was granted for this project by the author, Timotej Roiko.
 // A major thank you to Tim for better performing software.
-// The original TS code is taken from: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
+// The original TS code is taken from CloudStorm: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type {GatewayReceivePayload, GatewaySendPayload} from 'discord-api-types/v10';
+import type { GatewayReceivePayload } from 'discord-api-types/v10';
 import type Net from 'node:net';
-import {setTimeout as sleep} from 'node:timers/promises';
-import {EventEmitter} from 'node:events';
-import {createHash, randomBytes} from 'node:crypto';
-import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
-import {WebsocketEncoding, WebsocketStatus} from '../Constants';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
+import { AsyncEventEmitter } from '@vladfrangu/async_event_emitter';
+import { WebsocketEncoding, WebsocketEvents, WebsocketStatus } from '../Constants';
 import Https from 'https';
 import Http from 'http';
-import Util from 'util';
 
-interface WebsocketEvents {
-    ws_open: [];
-    ws_close: [number, string];
-    ws_receive: [GatewayReceivePayload];
-    ws_send: [GatewaySendPayload];
-    ws_error: [Error];
-    debug: [string];
-}
+export type WebsocketEventsMap = {
+    [WebsocketEvents.OPEN]: [];
+    [WebsocketEvents.CLOSE]: [number, string];
+    [WebsocketEvents.MESSAGE]: [GatewayReceivePayload];
+    [WebsocketEvents.ERROR]: [Error];
+    [WebsocketEvents.DEBUG]: [string];
+};
 
-export interface Websocket {
-    addListener<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    emit<E extends keyof WebsocketEvents>(event: E, ...args: WebsocketEvents[E]): boolean;
-    eventNames(): Array<keyof WebsocketEvents>;
-    listenerCount(event: keyof WebsocketEvents): number;
-    listeners(event: keyof WebsocketEvents): Array<(...args: Array<any>) => any>;
-    off<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    on<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    once<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    prependListener<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    prependOnceListener<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
-    rawListeners(event: keyof WebsocketEvents): Array<(...args: Array<any>) => any>;
-    removeAllListeners(event?: keyof WebsocketEvents): this;
-    removeListener<E extends keyof WebsocketEvents>(event: E, listener: (...args: WebsocketEvents[E]) => any): this;
+export interface ConnectOptions {
+    address: string;
+    encoding?: WebsocketEncoding;
+    compress?: boolean;
 }
 
 /**
- * Helper Class for simplifying the websocket connection to Discord.
+ * The class that establishes a connection and parses messages from websocket
  */
-export class Websocket extends EventEmitter {
-    public encoding: WebsocketEncoding;
-    public compress: boolean;
-    public status: WebsocketStatus;
-    public address: string|null;
+export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
+    private _encoding: WebsocketEncoding;
+    private _compress: boolean;
+    private _address: string|null;
     private _socket: Net.Socket | null;
+    private _status: WebsocketStatus;
     private readonly _internal: { closePromise: Promise<void> | null; zlib: Inflate | null; };
+
+    public get encoding(): WebsocketEncoding {
+        return this._encoding;
+    }
+
+    public get compress(): boolean {
+        return this._compress;
+    }
+
+    public get address(): string|null {
+        return this._address;
+    }
+
+    public get status(): WebsocketStatus {
+        return this._status;
+    }
 
     public constructor() {
         super();
-        this.encoding = WebsocketEncoding.JSON;
-        this.compress = false;
-        this.status = WebsocketStatus.CLOSED;
-        this.address = null;
+        this._encoding = WebsocketEncoding.JSON;
+        this._compress = false;
+        this._address = null;
         this._socket = null;
+        this._status = WebsocketStatus.CLOSED;
         this._internal = {
             closePromise: null,
             zlib: null,
         };
     }
 
-    public connect(address: string): Promise<void> {
+    public connect(options: ConnectOptions): Promise<void> {
         // if the status is open or connecting, do not do anything
-        if (this.status === WebsocketStatus.CONNECTING || this.status === WebsocketStatus.OPEN)
+        if (this._status === WebsocketStatus.CONNECTING || this._status === WebsocketStatus.OPEN)
             return Promise.resolve(void 0);
         // if the status is closing and connect was requested, we wait until the status is closed
-        if (this.status === WebsocketStatus.CLOSING) {
-            this.emit('debug', 'Websocket tried to connect, but the status is not closed. Retrying in 5s');
-            sleep(5000)
-                .then(() => this.connect(address));
-            return Promise.resolve(void 0);
+        if (this._status === WebsocketStatus.CLOSING) {
+            this.emit(WebsocketEvents.DEBUG, 'Websocket tried to connect, but the status is not closed. Retrying in 5s');
+            return sleep(5000)
+                .then(() => this.connect(options));
         }
         // status will be closed here, hence feel free to connect
+        this._address = options.address;
+        if (options.encoding) this._encoding = options.encoding;
+        if (options.compress) this._compress = options.compress;
         const key = randomBytes(16).toString('base64');
-        this.address = address;
-        const url = new URL(this.address);
+        const url = new URL(this._address);
         const useHttps = (url.protocol === 'https:' || url.protocol === 'wss:') || url.port === '443';
         const port = url.port || (useHttps ? '443' : '80');
         const req = (useHttps ? Https : Http).request({
@@ -91,16 +96,16 @@ export class Websocket extends EventEmitter {
                 'Sec-WebSocket-Version': '13',
             }
         });
-        this.status = WebsocketStatus.CONNECTING;
-        this.emit('debug', `Connecting to: ${address}`);
+        this._status = WebsocketStatus.CONNECTING;
+        this.emit(WebsocketEvents.DEBUG, `Connecting to: ${options.address}`);
         return new Promise((resolve, reject) => {
             req.on('upgrade', (res, socket) => {
                 const hash = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
                 const accept = res.headers['sec-websocket-accept'];
                 if (hash !== accept) {
                     socket.end(() => {
-                        this.emit('debug', 'Failed websocket-key validation');
-                        this.status = WebsocketStatus.CLOSED;
+                        this.emit(WebsocketEvents.DEBUG, 'Failed websocket-key validation');
+                        this._status = WebsocketStatus.CLOSED;
                         reject(new Error(`Invalid Sec-Websocket-Accept | expected: ${hash} | received: ${accept}`));
                     });
                     return;
@@ -109,19 +114,19 @@ export class Websocket extends EventEmitter {
                 socket.on('close', this._onClose.bind(this));
                 socket.on('readable', this._onReadable.bind(this));
                 this._socket = socket;
-                this.status = WebsocketStatus.OPEN;
-                this.emit('debug', `Connected to: ${address}`);
-                if (this.compress) {
+                this._status = WebsocketStatus.OPEN;
+                this.emit(WebsocketEvents.DEBUG, `Connected to: ${options.address}`);
+                if (this._compress) {
                     const z = createInflate();
                     // @ts-ignore
                     z._c = z.close; z._h = z._handle; z._hc = z._handle.close; z._v = () => void 0;
                     this._internal.zlib = z;
                 }
-                this.emit('ws_open');
+                this.emit(WebsocketEvents.OPEN);
                 resolve(void 0);
             });
             req.on('error', e => {
-                this.status = WebsocketStatus.CLOSED;
+                this._status = WebsocketStatus.CLOSED;
                 reject(e);
             });
             req.end();
@@ -143,20 +148,19 @@ export class Websocket extends EventEmitter {
         // @ts-ignore
         promise.resolve = resolver;
         internal.closePromise = promise;
-        this.status = WebsocketStatus.CLOSING;
+        this._status = WebsocketStatus.CLOSING;
         return promise;
     }
 
     public send(data: any): void {
         let encoded;
-        if (this.encoding === WebsocketEncoding.JSON) {
+        if (this._encoding === WebsocketEncoding.JSON) {
             encoded = Buffer.from(JSON.stringify(data));
             this._write(encoded, 1);
-        } else if (this.encoding === WebsocketEncoding.ETF) {
+        } else if (this._encoding === WebsocketEncoding.ETF) {
             encoded = writeETF(data);
             this._write(encoded, 2);
         }
-        this.emit('ws_send', data);
     }
 
     private _write(packet: Buffer, opcode: number) {
@@ -185,8 +189,7 @@ export class Websocket extends EventEmitter {
 
     private _onError(error: Error) {
         if (!this._socket) return;
-        this.emit('ws_error', error);
-        this.emit('debug', Util.inspect(error, true, 1, false));
+        this.emit(WebsocketEvents.ERROR, error);
         this._write(Buffer.allocUnsafe(0), 8);
     }
 
@@ -198,7 +201,7 @@ export class Websocket extends EventEmitter {
         socket.removeListener('error', this._onError);
         socket.removeListener('close', this._onClose);
         this._socket = null;
-        this.status = WebsocketStatus.CLOSED;
+        this._status = WebsocketStatus.CLOSED;
         if (internal.zlib) {
             internal.zlib.close();
             internal.zlib = null;
@@ -221,7 +224,8 @@ export class Websocket extends EventEmitter {
             if (!frame) return;
             const fin = frame[0] >> 7;
             const opcode = frame[0] & 15;
-            if (fin !== 1 || opcode === 0) this.emit('debug', 'Discord actually does send messages with fin=0. if you see this error let me know');
+            if (fin !== 1 || opcode === 0)
+                this.emit(WebsocketEvents.DEBUG, 'Discord actually does send messages with fin=0. if you see this error let me know');
             const payload = frame.subarray(2 + bytes);
             this._processFrame(opcode, payload);
         }
@@ -232,12 +236,12 @@ export class Websocket extends EventEmitter {
         switch (opcode) {
             case 1: {
                 const packet = JSON.parse(message.toString());
-                this.emit('ws_receive', packet);
+                this.emit(WebsocketEvents.MESSAGE, packet);
                 break;
             }
             case 2: {
                 let packet;
-                if (this.compress) {
+                if (this._compress) {
                     const z = internal.zlib;
                     let error = null;
                     let data = null;
@@ -250,7 +254,8 @@ export class Websocket extends EventEmitter {
                         error = e;
                     }
                     const l = message.length;
-                    if (message[l - 4] !== 0 || message[l - 3] !== 0 || message[l - 2] !== 255 || message[l - 1] !== 255) this.emit('debug', 'Discord actually does send fragmented zlib messages. If you see this error let me know');
+                    if (message[l - 4] !== 0 || message[l - 3] !== 0 || message[l - 2] !== 255 || message[l - 1] !== 255)
+                        this.emit(WebsocketEvents.DEBUG, 'Discord actually does send fragmented zlib messages. If you see this error let me know');
                     // @ts-ignore
                     z.close = z._c;
                     // @ts-ignore
@@ -263,26 +268,26 @@ export class Websocket extends EventEmitter {
                     z._eventCount--;
                     z!.removeAllListeners('error');
                     if (error) {
-                        this.emit('debug', 'Zlib error processing chunk');
+                        this.emit(WebsocketEvents.DEBUG, 'Zlib error processing chunk');
                         this._write(Buffer.allocUnsafe(0), 8);
                         return;
                     }
                     if (!data) {
-                        this.emit('debug', 'Data from zlib processing was null. If you see this error let me know'); // This should never run, but TS is lame
+                        this.emit(WebsocketEvents.DEBUG, 'Data from zlib processing was null. If you see this error let me know'); // This should never run, but TS is lame
                         return;
                     }
-                    packet = this.encoding === WebsocketEncoding.JSON ? JSON.parse(String(data)) : readETF(data, 1);
-                } else if (this.encoding === WebsocketEncoding.JSON) {
+                    packet = this._encoding === WebsocketEncoding.JSON ? JSON.parse(String(data)) : readETF(data, 1);
+                } else if (this._encoding === WebsocketEncoding.JSON) {
                     const data = inflateSync(message);
                     packet = JSON.parse(data.toString());
                 } else packet = readETF(message, 1);
-                this.emit('ws_receive', packet);
+                this.emit(WebsocketEvents.MESSAGE, packet);
                 break;
             }
             case 8: {
                 const code = message.length > 1 ? (message[0] << 8) + message[1] : 0;
                 const reason = message.length > 2 ? message.subarray(2).toString() : '';
-                this.emit('ws_close', code, reason);
+                this.emit(WebsocketEvents.CLOSE, code, reason);
                 this._write(Buffer.from([ code >> 8, code & 255 ]), 8);
                 break;
             }

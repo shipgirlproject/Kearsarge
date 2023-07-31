@@ -5,75 +5,38 @@ import { once } from 'node:events';
 import { clearInterval, clearTimeout, setInterval, setTimeout } from 'node:timers';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { URLSearchParams } from 'node:url';
-import { IContextFetchingStrategy, getInitialSendRateLimitState, ImportantGatewayOpcodes, SessionInfo } from '@discordjs/ws';
-import { Collection } from '@discordjs/collection';
-import { AsyncQueue } from '@sapphire/async-queue';
-import { AsyncEventEmitter } from '@vladfrangu/async_event_emitter';
 import {
     GatewayCloseCodes,
     GatewayDispatchEvents,
     GatewayOpcodes,
-    type GatewayDispatchPayload,
     type GatewayIdentifyData,
-    type GatewayReadyDispatchData,
     type GatewayReceivePayload,
-    type GatewaySendPayload,
+    type GatewaySendPayload
 } from 'discord-api-types/v10';
+import {
+    ImportantGatewayOpcodes,
+    IContextFetchingStrategy,
+    SessionInfo,
+    WebSocketShardEvents,
+    WebSocketShardStatus,
+    WebSocketShardDestroyRecovery,
+    WebSocketShardEventsMap,
+    WebSocketShardDestroyOptions,
+    CloseCodes,
+    SendRateLimitState,
+    getInitialSendRateLimitState
+} from '@discordjs/ws';
+import { Collection } from '@discordjs/collection';
+import { AsyncQueue } from '@sapphire/async-queue';
+import { AsyncEventEmitter } from '@vladfrangu/async_event_emitter';
 import { Websocket } from './Websocket';
-import { WebsocketEncoding } from '../Constants';
-
-export enum WebSocketShardEvents {
-    Closed = 'closed',
-    Debug = 'debug',
-    Dispatch = 'dispatch',
-    Error = 'error',
-    HeartbeatComplete = 'heartbeat',
-    Hello = 'hello',
-    Ready = 'ready',
-    Resumed = 'resumed',
-}
-
-export enum WebSocketShardStatus {
-    Idle,
-    Connecting,
-    Resuming,
-    Ready,
-}
-
-export enum WebSocketShardDestroyRecovery {
-    Reconnect,
-    Resume,
-}
-
-export type WebSocketShardEventsMap = {
-    [WebSocketShardEvents.Closed]: [{ code: number }];
-    [WebSocketShardEvents.Debug]: [payload: { message: string }];
-    [WebSocketShardEvents.Dispatch]: [payload: { data: GatewayDispatchPayload }];
-    [WebSocketShardEvents.Error]: [payload: { error: Error }];
-    [WebSocketShardEvents.Hello]: [];
-    [WebSocketShardEvents.Ready]: [payload: { data: GatewayReadyDispatchData }];
-    [WebSocketShardEvents.Resumed]: [];
-    [WebSocketShardEvents.HeartbeatComplete]: [payload: { ackAt: number; heartbeatAt: number; latency: number }];
-};
-
-export interface WebSocketShardDestroyOptions {
-    code?: number;
-    reason?: string;
-    recover?: WebSocketShardDestroyRecovery;
-}
-
-export enum CloseCodes {
-    Normal = 1_000,
-    Resuming = 4_200,
-}
-
-export interface SendRateLimitState {
-    remaining: number;
-    resetAt: number;
-}
+import { WebsocketEncoding, WebsocketEvents, WebsocketStatus } from '../Constants';
 
 const recoverableErrorsRegex = /(?:EAI_AGAIN)|(?:ECONNRESET)/;
 
+/**
+ * The class that manages the ws connection, from heartbeats to parsing op codes
+ */
 export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     public readonly id: number;
     public readonly strategy: IContextFetchingStrategy;
@@ -97,10 +60,10 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         this.id = id;
         this.strategy = strategy;
         this.connection = new Websocket()
-            .on('ws_close', number => this.onClose(number))
-            .on('ws_receive', payload => this.onMessage(payload))
-            .on('ws_error', error => this.onError(error))
-            .on('debug', message => this.debug([ 'Internal Websocket Class Message', message ]));
+            .on(WebsocketEvents.CLOSE, number => this.onClose(number))
+            .on(WebsocketEvents.MESSAGE, payload => this.onMessage(payload))
+            .on(WebsocketEvents.ERROR, error => this.onError(error))
+            .on(WebsocketEvents.DEBUG, message => this.debug([ 'Internal Websocket Class Message', message ]));
     }
 
     public async connect(): Promise<void> {
@@ -109,12 +72,14 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         const { version, encoding, compression } = this.strategy.options;
         const params = new URLSearchParams({ v: version, encoding });
         if (compression) params.append('compress', compression);
-        this.connection.encoding = encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF;
-        this.connection.compress = !!compression;
         const session = await this.strategy.retrieveSessionInfo(this.id);
         this._status = WebSocketShardStatus.Connecting;
         try {
-            await this.connection.connect(`${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`);
+            await this.connection.connect({
+                address: `${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`,
+                encoding: encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF,
+                compress: !!compression
+            });
         } catch (error: any) {
             this._status = WebSocketShardStatus.Idle;
             if (!recoverableErrorsRegex.test(error.toString())) throw error;
@@ -207,8 +172,17 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     }
 
     public async send(payload: GatewaySendPayload): Promise<void> {
-        if (!this.connection)
-            throw new Error('WebSocketShard wasn\'t connected');
+        // wait for the websocket to open if we sent a packet before it was ready
+        if (this.connection.status !== WebsocketStatus.OPEN) {
+            this.debug([ 'Tried to send a payload before the websocket is open. waiting' ]);
+            try {
+                // This will throw if the websocket throws an error event in the meantime, just requeue the payload
+                await once(this.connection, WebsocketEvents.OPEN);
+            } catch {
+                return this.send(payload);
+            }
+        }
+        // wait for this shard status to be ready before sending unimportant payloads
         if (this._status !== WebSocketShardStatus.Ready && !ImportantGatewayOpcodes.has(payload.op)) {
             this.debug([ 'Tried to send a non-crucial payload before the shard was ready, waiting' ]);
             // This will throw if the shard throws an error event in the meantime, just requeue the payload
@@ -223,7 +197,6 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
             const now = Date.now();
             if (this.sendRateLimitState.resetAt > now) {
                 const sleepFor = this.sendRateLimitState.resetAt - now;
-
                 this.debug([ `Was about to hit the send rate limit, sleeping for ${sleepFor}ms` ]);
                 const controller = new AbortController();
                 // Sleep for the remaining time, but if the connection closes in the meantime, we shouldn't wait the remainder to avoid blocking the new conn
@@ -402,7 +375,6 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
                 const jitter = Math.random();
                 const firstWait = Math.floor(payload.d.heartbeat_interval * jitter);
                 this.debug([ `Preparing first heartbeat of the connection with a jitter of ${jitter}; waiting ${firstWait}ms` ]);
-
                 try {
                     const controller = new AbortController();
                     this.initialHeartbeatTimeoutController = controller;
