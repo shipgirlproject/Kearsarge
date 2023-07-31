@@ -4,7 +4,7 @@ import {
     SimpleShardingStrategy,
     WebSocketShardEvents
 } from '@discordjs/ws';
-import { WebsocketShard } from './structure/WebsocketShard';
+import { WebsocketShard } from '../../structure/WebsocketShard';
 
 export class KearsargeSimpleStrategy extends SimpleShardingStrategy {
     public async spawn(shardIds: number[]): Promise<void> {

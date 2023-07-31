@@ -1,3 +1,4 @@
+import { parentPort } from 'worker_threads';
 import {
     BootstrapOptions,
     WebSocketShardEvents,
@@ -6,10 +7,9 @@ import {
     WorkerReceivePayload,
     WorkerReceivePayloadOp
 } from '@discordjs/ws';
-import { WebsocketShard } from './WebsocketShard';
-import { parentPort } from 'worker_threads';
+import { WebsocketShard } from '../../structure/WebsocketShard';
 
-export class BootStrapper extends WorkerBootstrapper {
+export class KearsargeBootstrapper extends WorkerBootstrapper {
     public async bootstrap(options: Readonly<BootstrapOptions> = {}): Promise<void> {
         // Start by initializing the shards
         for (const shardId of this.data.shardIds) {

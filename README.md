@@ -46,6 +46,36 @@ const client = new Client(options);
 await client.login();
 ```
 
+> Using with Indomitable with enabled concurrency handling
+
+* Please do note that don't use this if you dont use `handleConcurrency`, in those cases, use the discordjs strategies
+
+```js
+import { IndomitableStrategy } from 'kearsarge';
+import { Indomitable } from 'indomitable';
+import { Client } from 'discord.js';
+
+const options = {
+    clusterCount: 2,
+    shardCount: 8,
+    clientOptions: {
+        intents: [1 << 0],
+        ws: {
+            buildStrategy: manager => new IndomitableStrategy(manager)
+        }
+    },
+    autoRestart: true,
+    handleConcurrency: true,
+    client: Client,
+    token: process.env.DISCORD_TOKEN
+}
+
+const manager = new Indomitable(options)
+    .on('error', console.error);
+
+manager.spawn();
+```
+
 > Using simple strategy (Discord.JS default strategy)
 ```js
 import { KearsargeSimpleStrategy } from 'kearsarge';

@@ -7,7 +7,7 @@ export class KearsargeWorkerStrategy extends WorkerShardingStrategy {
         // @ts-expect-error: access passed options
         const path = this.options.workerPath;
         if (!path) {
-            return join(__dirname, 'src/', 'DefaultWorker.js');
+            return join(__dirname, 'src/strategies/discordjs', 'KearsargeWorker.js');
         }
         if (isAbsolute(path)) {
             return path;
