@@ -2,7 +2,7 @@
 
 > An alternative set of strategies for [@discordjs/ws](https://github.com/discordjs/discord.js/tree/main/packages/ws) using [CloudStorm](https://github.com/DasWolke/CloudStorm/tree/master)
 <p align="center">
-    <img src="https://azurlane.netojuu.com/images/4/46/Kearsarge.png"> 
+    <img src="https://safe.kashima.moe/315ktpr2490f.png"> 
 </p>
 
 > The ShipGirl Project, feat Kearsarge; ⓒ Azur Lane
