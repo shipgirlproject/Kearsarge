@@ -3,13 +3,13 @@
 // A major thank you to Tim for better performing software.
 // The original TS code is taken from: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type {GatewayReceivePayload, GatewaySendPayload} from 'discord-api-types/v10';
+import type { GatewayReceivePayload, GatewaySendPayload } from 'discord-api-types/v10';
 import type Net from 'node:net';
-import {setTimeout as sleep} from 'node:timers/promises';
-import {EventEmitter} from 'node:events';
-import {createHash, randomBytes} from 'node:crypto';
-import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
-import {WebsocketEncoding, WebsocketStatus} from '../Constants';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { EventEmitter } from 'node:events';
+import { createHash, randomBytes } from 'node:crypto';
+import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
+import { WebsocketEncoding, WebsocketStatus } from '../Constants';
 import Https from 'https';
 import Http from 'http';
 import Util from 'util';
@@ -69,7 +69,7 @@ export class Websocket extends EventEmitter {
             return Promise.resolve(void 0);
         // if the status is closing and connect was requested, we wait until the status is closed
         if (this.status === WebsocketStatus.CLOSING) {
-            this.emit('debug', `Websocket tried to connect, but the status is not closed. Retrying in 5s`);
+            this.emit('debug', 'Websocket tried to connect, but the status is not closed. Retrying in 5s');
             sleep(5000)
                 .then(() => this.connect(address));
             return Promise.resolve(void 0);
