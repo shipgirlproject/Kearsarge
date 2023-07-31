@@ -143,9 +143,9 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         const closeController = new AbortController();
         try {
             // If the first promise resolves, all is well. If the 2nd promise resolves,
-            // the shard has meanwhile closed. In that case, a destroy is already ongoing, so we just need to
+            // the shard has meanwhile closed. In that case, destroy is already ongoing, so we just need to
             // return false. Meanwhile, if something rejects (error event) or the first controller is aborted,
-            // we enter the catch block and trigger a destroy there.
+            // we enter the catch block and trigger destroy there.
             const closed = await Promise.race<boolean>([
                 once(this, event, { signal: timeoutController.signal }).then(() => false),
                 once(this, WebSocketShardEvents.Closed, { signal: closeController.signal }).then(() => true),
@@ -176,9 +176,12 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         if (this.connection.status !== WebsocketStatus.OPEN) {
             this.debug([ 'Tried to send a payload before the websocket is open. waiting' ]);
             try {
-                // This will throw if the websocket throws an error event in the meantime, just requeue the payload
-                await once(this.connection, WebsocketEvents.OPEN);
+                // This will never throw an error, hence set an abort controller to avoid memory leaks
+                const controller = new AbortController();
+                setTimeout(() => controller.abort(), 30_000);
+                await once(this.connection, WebsocketEvents.OPEN, { signal: controller.signal });
             } catch {
+                // waiting for open event was aborted, max wait time is 30s, and requeue that packet
                 return this.send(payload);
             }
         }
