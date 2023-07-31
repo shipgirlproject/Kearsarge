@@ -112,14 +112,20 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         this.connection.encoding = encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF;
         this.connection.compress = !!compression;
         const session = await this.strategy.retrieveSessionInfo(this.id);
+        if (!session) {
+            this.debug([ 'Can\'t fetch sessions, retrying in 5s' ]);
+            await sleep(5000);
+            return await this.connect();
+        }
         this._status = WebSocketShardStatus.Connecting;
         try {
             await this.connection.connect(`${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`);
         } catch (error: any) {
             this._status = WebSocketShardStatus.Idle;
             if (!recoverableErrorsRegex.test(error.toString())) throw error;
-            await sleep(500);
-            return this.connect();
+            this.debug([ 'Can\'t initially connect to websocket due to network error, retrying in 5s' ]);
+            await sleep(5000);
+            return await this.connect();
         }
         if (session!.shardCount === this.strategy.options.shardCount)
             await this.resume(session!);
