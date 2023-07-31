@@ -112,11 +112,6 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         this.connection.encoding = encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF;
         this.connection.compress = !!compression;
         const session = await this.strategy.retrieveSessionInfo(this.id);
-        if (!session) {
-            this.debug([ 'Can\'t fetch sessions, retrying in 5s' ]);
-            await sleep(5000);
-            return await this.connect();
-        }
         this._status = WebSocketShardStatus.Connecting;
         try {
             await this.connection.connect(`${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`);
@@ -127,8 +122,8 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
             await sleep(5000);
             return await this.connect();
         }
-        if (session!.shardCount === this.strategy.options.shardCount)
-            await this.resume(session!);
+        if (session?.shardCount === this.strategy.options.shardCount)
+            await this.resume(session);
         else
             await this.identify();
     }
