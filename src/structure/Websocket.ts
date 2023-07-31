@@ -163,7 +163,7 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
         }
     }
 
-    private _write(packet: Buffer, opcode: number) {
+    private _write(packet: Buffer, opcode: number): void {
         const socket = this._socket;
         if (!socket?.writable) return;
         const length = packet.length;
@@ -187,13 +187,13 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
         socket.write(frame);
     }
 
-    private _onError(error: Error) {
+    private _onError(error: Error): void {
         if (!this._socket) return;
         this.emit(WebsocketEvents.ERROR, error);
         this._write(Buffer.allocUnsafe(0), 8);
     }
 
-    private _onClose() {
+    private _onClose(): void {
         const socket = this._socket;
         const internal = this._internal;
         if (!socket) return;
@@ -210,7 +210,7 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
         if (internal.closePromise) internal.closePromise.resolve(void 0);
     }
 
-    private _onReadable() {
+    private _onReadable(): void {
         const socket = this._socket;
         while((socket?.readableLength || 0) > 1) {
             let length = readRange(socket!, 1, 1) & 127;
@@ -231,7 +231,7 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
         }
     }
 
-    private _processFrame(opcode: number, message: Buffer) {
+    private _processFrame(opcode: number, message: Buffer): void {
         const internal = this._internal;
         switch (opcode) {
             case 1: {
@@ -299,7 +299,7 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
     }
 }
 
-export function readRange(socket: import('net').Socket, index: number, bytes: number) {
+export function readRange(socket: import('net').Socket, index: number, bytes: number): number {
     // @ts-ignore
     let head = socket._readableState.buffer.head;
     let cursor = 0;
@@ -317,7 +317,7 @@ export function readRange(socket: import('net').Socket, index: number, bytes: nu
     throw new Error('readRange failed?');
 }
 
-export function readETF(data: Buffer, start: number) {
+export function readETF(data: Buffer, start: number): {} | null | undefined {
     let view: DataView | undefined;
     let x = start;
     const loop = () => {
@@ -435,7 +435,7 @@ export function readETF(data: Buffer, start: number) {
     return loop();
 }
 
-export function writeETF(data: any) {
+export function writeETF(data: any): Buffer {
     const b = Buffer.allocUnsafe(1 << 12);
     b[0] = 131;
     let i = 1;

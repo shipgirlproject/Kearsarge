@@ -290,7 +290,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         });
     }
 
-    private async heartbeat(requested = false) {
+    private async heartbeat(requested = false): Promise<void> {
         if (!this.isAck && !requested) {
             return this.destroy({ reason: 'Zombie connection', recover: WebSocketShardDestroyRecovery.Resume });
         }
@@ -303,7 +303,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         this.isAck = false;
     }
 
-    private async onMessage(payload: GatewayReceivePayload) {
+    private async onMessage(payload: GatewayReceivePayload): Promise<void> {
         switch (payload.op) {
             case GatewayOpcodes.Dispatch: {
                 if (this._status === WebSocketShardStatus.Resuming) {
@@ -515,7 +515,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         }
     }
 
-    private debug(messages: [string, ...string[]]) {
+    private debug(messages: [string, ...string[]]): void {
         const message = `${messages[0]}${
             messages.length > 1
                 ? `\n${messages
