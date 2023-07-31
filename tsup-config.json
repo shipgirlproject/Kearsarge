@@ -1,6 +1,6 @@
 {
     "dts": true,
-    "entry": ["index.ts", "src/DefaultWorker.ts"],
+    "entry": ["index.ts", "src/strategies/discordjs/KearsargeWorker.ts", "src/strategies/indomitable/IndomitableWorker.ts"],
     "splitting": false,
     "sourcemap": true,
     "clean": true,
