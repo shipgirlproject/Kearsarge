@@ -3,12 +3,13 @@
 // A major thank you to Tim for better performing software.
 // The original TS code is taken from: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type { GatewayReceivePayload, GatewaySendPayload } from 'discord-api-types/v10';
+import type {GatewayReceivePayload, GatewaySendPayload} from 'discord-api-types/v10';
 import type Net from 'node:net';
-import { EventEmitter } from 'node:events';
-import { createHash, randomBytes } from 'node:crypto';
-import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
-import { WebsocketEncoding, WebsocketStatus } from '../Constants';
+import {setTimeout as sleep} from 'node:timers/promises';
+import {EventEmitter} from 'node:events';
+import {createHash, randomBytes} from 'node:crypto';
+import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
+import {WebsocketEncoding, WebsocketStatus} from '../Constants';
 import Https from 'https';
 import Http from 'http';
 import Util from 'util';
@@ -63,7 +64,17 @@ export class Websocket extends EventEmitter {
     }
 
     public connect(address: string): Promise<void> {
-        if (this._socket) return Promise.resolve(void 0);
+        // if the status is open or connecting, do not do anything
+        if (this.status === WebsocketStatus.CONNECTING || this.status === WebsocketStatus.OPEN)
+            return Promise.resolve(void 0);
+        // if the status is closing and connect was requested, we wait until the status is closed
+        if (this.status === WebsocketStatus.CLOSING) {
+            this.emit('debug', `Websocket tried to connect, but the status is not closed. Retrying in 5s`);
+            sleep(5000)
+                .then(() => this.connect(address));
+            return Promise.resolve(void 0);
+        }
+        // status will be closed here, hence feel free to connect
         const key = randomBytes(16).toString('base64');
         this.address = address;
         const url = new URL(this.address);
@@ -98,14 +109,14 @@ export class Websocket extends EventEmitter {
                 socket.on('close', this._onClose.bind(this));
                 socket.on('readable', this._onReadable.bind(this));
                 this._socket = socket;
+                this.status = WebsocketStatus.OPEN;
+                this.emit('debug', `Connected to: ${address}`);
                 if (this.compress) {
                     const z = createInflate();
                     // @ts-ignore
                     z._c = z.close; z._h = z._handle; z._hc = z._handle.close; z._v = () => void 0;
                     this._internal.zlib = z;
                 }
-                this.status = WebsocketStatus.OPEN;
-                this.emit('debug', `Connected to: ${address}`);
                 this.emit('ws_open');
                 resolve(void 0);
             });
