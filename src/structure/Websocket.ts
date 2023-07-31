@@ -60,7 +60,6 @@ export class Websocket extends EventEmitter {
             closePromise: null,
             zlib: null,
         };
-        this.emit('debug', 'Note: Using a custom websocket connection, if there are any issues let me know at https://github.com/Deivu/Kearsarge/issues');
     }
 
     public connect(address: string): Promise<void> {
@@ -82,6 +81,7 @@ export class Websocket extends EventEmitter {
             }
         });
         this.status = WebsocketStatus.CONNECTING;
+        this.emit('debug', `Connecting to: ${address}`);
         return new Promise((resolve, reject) => {
             req.on('upgrade', (res, socket) => {
                 const hash = createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
@@ -105,6 +105,7 @@ export class Websocket extends EventEmitter {
                     this._internal.zlib = z;
                 }
                 this.status = WebsocketStatus.OPEN;
+                this.emit('debug', `Connected to: ${address}`);
                 this.emit('ws_open');
                 resolve(void 0);
             });
