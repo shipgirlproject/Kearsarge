@@ -1,24 +1,8 @@
-import { WorkerShardingStrategy } from '@discordjs/ws';
-import { join, isAbsolute, resolve } from 'node:path';
+import { join } from 'node:path';
+import { WebSocketManager, WorkerShardingStrategy, WorkerShardingStrategyOptions } from '@discordjs/ws';
 
-// @ts-expect-error: replaces the resolve worker path due to custom worker
 export class KearsargeWorkerStrategy extends WorkerShardingStrategy {
-    private resolveWorkerPath(): string {
-        // @ts-expect-error: access passed options
-        const path = this.options.workerPath;
-        if (!path) {
-            return join(__dirname, 'src/strategies/discordjs', 'KearsargeWorker.js');
-        }
-        if (isAbsolute(path)) {
-            return path;
-        }
-        if (/^\.\.?[/\\]/.test(path)) {
-            return resolve(path);
-        }
-        try {
-            return require.resolve(path);
-        } catch {
-            return resolve(path);
-        }
+    constructor(manager: WebSocketManager, options: WorkerShardingStrategyOptions) {
+        super(manager, { ...options, ...{ workerPath: join(__dirname, 'src/strategies/discordjs', 'KearsargeWorker.js') }});
     }
 }

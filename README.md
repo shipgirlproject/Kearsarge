@@ -48,7 +48,7 @@ await client.login();
 
 > Using with Indomitable with enabled concurrency handling
 
-* Please do note that don't use this if you dont use `handleConcurrency`, in those cases, use the discordjs strategies
+* Note: Don't use this if you don't use `handleConcurrency`. in those cases, use the discordjs strategies
 
 ```js
 import { IndomitableStrategy } from 'kearsarge';
