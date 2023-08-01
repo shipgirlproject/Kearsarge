@@ -60,7 +60,6 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         super();
         this.id = id;
         this.strategy = strategy;
-
         this.replayedEvents = 0;
         this.isAck = true;
         this.sendRateLimitState = getInitialSendRateLimitState();
