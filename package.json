@@ -20,6 +20,14 @@
     "lint": "eslint . --ext .ts --fix",
     "prepare": "npm run build:ts"
   },
+  "keywords": [
+    "discord",
+    "discord.js",
+    "discordjs",
+    "bot",
+    "api",
+    "gateway"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Deivu/Kearsarge.git"
