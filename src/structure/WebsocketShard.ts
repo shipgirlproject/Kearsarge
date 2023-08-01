@@ -93,7 +93,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
                 `Url: ${url}`,
                 `Version: ${version}`,
                 `Encoding: ${encoding}`,
-                `Compression: ${compression}`
+                `Compression: ${compression || 'none'}`
             ])
             await this.connection.connect({
                 address: `${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`,
