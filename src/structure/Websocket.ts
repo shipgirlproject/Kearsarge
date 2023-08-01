@@ -298,6 +298,7 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
                 } else {
                     // this is most likely not to be hit but just in-case
                     this.emit(WebsocketEvents.DEBUG, 'Unsupported encoding');
+                    return;
                 }
 
                 // emit the message
