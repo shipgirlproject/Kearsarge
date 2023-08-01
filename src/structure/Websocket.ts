@@ -3,13 +3,13 @@
 // A major thank you to Tim for better performing software.
 // The original TS code is taken from CloudStorm: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type { GatewayReceivePayload } from 'discord-api-types/v10';
+import type {GatewayReceivePayload} from 'discord-api-types/v10';
 import type Net from 'node:net';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { createHash, randomBytes } from 'node:crypto';
-import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
-import { AsyncEventEmitter } from '@vladfrangu/async_event_emitter';
-import { WebsocketEncoding, WebsocketEvents, WebsocketStatus } from '../Constants';
+import {setTimeout as sleep} from 'node:timers/promises';
+import {createHash, randomBytes} from 'node:crypto';
+import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
+import {AsyncEventEmitter} from '@vladfrangu/async_event_emitter';
+import {WebsocketEncoding, WebsocketEvents, WebsocketStatus} from '../Constants';
 import Https from 'https';
 import Http from 'http';
 
@@ -240,7 +240,9 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
                 break;
             }
             case 2: {
-                let packet;
+                let packet: any = message;
+
+                // if zlib compression is enabled
                 if (this._compress) {
                     const z = internal.zlib;
                     let error = null;
@@ -276,11 +278,29 @@ export class Websocket extends AsyncEventEmitter<WebsocketEventsMap> {
                         this.emit(WebsocketEvents.DEBUG, 'Data from zlib processing was null. If you see this error let me know'); // This should never run, but TS is lame
                         return;
                     }
-                    packet = this._encoding === WebsocketEncoding.JSON ? JSON.parse(String(data)) : readETF(data, 1);
-                } else if (this._encoding === WebsocketEncoding.JSON) {
-                    const data = inflateSync(message);
-                    packet = JSON.parse(data.toString());
-                } else packet = readETF(message, 1);
+                    // data is decompressed and ready to decode
+                    packet = data;
+                }
+
+                if (this._encoding === WebsocketEncoding.JSON) {
+                    // if encoding is json
+                    if (!this._compress) packet = inflateSync(packet);
+                    packet = JSON.parse(packet.toString());
+                } else if (this._encoding === WebsocketEncoding.ETF) {
+                    // if encoding is etf
+                    try {
+                        packet = readETF(packet, 1);
+                    } catch (error: any) {
+                        // if errored, we emit on debug to avoid uncaught errors
+                        this.emit(WebsocketEvents.DEBUG, `Failed to process etf data. Error Message: ${error.toString()}`);
+                        return;
+                    }
+                } else {
+                    // this is most likely not to be hit but just in-case
+                    this.emit(WebsocketEvents.DEBUG, 'Unsupported encoding');
+                }
+
+                // emit the message
                 this.emit(WebsocketEvents.MESSAGE, packet);
                 break;
             }

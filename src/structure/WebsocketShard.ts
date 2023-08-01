@@ -199,15 +199,16 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     public async send(payload: GatewaySendPayload): Promise<void> {
         // wait for the websocket to open if we sent a packet before it was ready
         if (this.connection.status !== WebsocketStatus.OPEN) {
-            this.debug([ 'Tried to send a payload before the websocket is open. waiting' ]);
+            this.debug([ 'Tried to send a payload before the websocket is open. Waiting' ]);
             try {
                 // This will never throw an error, hence set an abort controller to avoid memory leaks
                 const controller = new AbortController();
-                setTimeout(() => controller.abort(), 30_000);
+                setTimeout(() => controller.abort(), 10_000);
                 await once(this.connection, WebsocketEvents.OPEN, { signal: controller.signal });
             } catch {
-                // waiting for open event was aborted, max wait time is 30s, and requeue that packet
-                return this.send(payload);
+                this.debug([ 'Tried to send a payload but websocket never opened. Ignoring' ]);
+                // if after 10 seconds, websocket open was not achieved, do nothing to reconnect. Opening a ws shouldn't take long
+                return;
             }
         }
         // wait for this shard status to be ready before sending unimportant payloads

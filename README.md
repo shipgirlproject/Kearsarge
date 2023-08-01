@@ -125,6 +125,7 @@ import { REST } from '@discordjs/rest';
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 const manager = new WebSocketManager({
+    token: process.env.DISCORD_TOKEN,
     // @ts-expect-error: overrides the type of discord.js encodings
     encoding: WebsocketEncoding.ETF,
     compression: CompressionMethod.ZlibStream,
