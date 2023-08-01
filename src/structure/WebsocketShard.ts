@@ -75,7 +75,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
             .on(WebsocketEvents.CLOSE, number => this.onEvent(WebsocketEvents.CLOSE, number))
             .on(WebsocketEvents.MESSAGE, payload => this.onEvent(WebsocketEvents.MESSAGE, payload))
             .on(WebsocketEvents.ERROR, error => this.onError(error))
-            .on(WebsocketEvents.DEBUG, message => this.debug([ 'Internal Websocket Class Message', message ]));
+            .on(WebsocketEvents.DEBUG, message => this.debug([ 'Websocket Debug', message ]));
     }
 
     public async connect(): Promise<void> {
@@ -85,8 +85,16 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         const params = new URLSearchParams({ v: version, encoding });
         if (compression) params.append('compress', compression);
         const session = await this.strategy.retrieveSessionInfo(this.id);
+        const url = session?.resumeURL ?? this.strategy.options.gatewayInformation.url
         this._status = WebSocketShardStatus.Connecting;
         try {
+            this.debug([
+                'Gateway Info ',
+                `Url: ${url}`,
+                `Version: ${version}`,
+                `Encoding: ${encoding}`,
+                `Compression: ${compression}`
+            ])
             await this.connection.connect({
                 address: `${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`,
                 encoding: encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF,
@@ -267,10 +275,9 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         }
         this.debug([
             'Identifying',
-            `shard id: ${this.id.toString()}`,
-            `shard count: ${this.strategy.options.shardCount}`,
-            `intents: ${this.strategy.options.intents}`,
-            `compression: ${this.strategy.options.compression}`,
+            `Shard Id: ${this.id.toString()}`,
+            `Shard Count: ${this.strategy.options.shardCount}`,
+            `Intents: ${this.strategy.options.intents}`
         ]);
         const d: GatewayIdentifyData = {
             token: this.strategy.options.token,
