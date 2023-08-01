@@ -3,13 +3,13 @@
 // A major thank you to Tim for better performing software.
 // The original TS code is taken from CloudStorm: https://github.com/DasWolke/CloudStorm/blob/master/src/structures/BetterWs.ts
 
-import type {GatewayReceivePayload} from 'discord-api-types/v10';
+import type { GatewayReceivePayload } from 'discord-api-types/v10';
 import type Net from 'node:net';
-import {setTimeout as sleep} from 'node:timers/promises';
-import {createHash, randomBytes} from 'node:crypto';
-import {constants, createInflate, Inflate, inflateSync} from 'node:zlib';
-import {AsyncEventEmitter} from '@vladfrangu/async_event_emitter';
-import {WebsocketEncoding, WebsocketEvents, WebsocketStatus} from '../Constants';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { constants, createInflate, Inflate, inflateSync } from 'node:zlib';
+import { AsyncEventEmitter } from '@vladfrangu/async_event_emitter';
+import { WebsocketEncoding, WebsocketEvents, WebsocketStatus } from '../Constants';
 import Https from 'https';
 import Http from 'http';
 
