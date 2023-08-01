@@ -85,18 +85,18 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         const params = new URLSearchParams({ v: version, encoding });
         if (compression) params.append('compress', compression);
         const session = await this.strategy.retrieveSessionInfo(this.id);
-        const url = session?.resumeURL ?? this.strategy.options.gatewayInformation.url
-        this._status = WebSocketShardStatus.Connecting;
+        const address = session?.resumeURL ?? this.strategy.options.gatewayInformation.url;
+        this.debug([
+            'Gateway Info ',
+            `Url: ${address}`,
+            `Version: ${version}`,
+            `Encoding: ${encoding}`,
+            `Compression: ${compression || 'none'}`
+        ]);
         try {
-            this.debug([
-                'Gateway Info ',
-                `Url: ${url}`,
-                `Version: ${version}`,
-                `Encoding: ${encoding}`,
-                `Compression: ${compression || 'none'}`
-            ])
+            this._status = WebSocketShardStatus.Connecting;
             await this.connection.connect({
-                address: `${session?.resumeURL ?? this.strategy.options.gatewayInformation.url}?${params.toString()}`,
+                address: address,
                 encoding: encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF,
                 compress: !!compression
             });

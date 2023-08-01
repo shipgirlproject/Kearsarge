@@ -21,8 +21,11 @@
 
 ### Installation
 
+* Stable Branch
+> `npm i kearsarge --save`
+
 * Dev Branch
-> `npm install https://github.com/Deivu/Kearsarge.git`
+> `npm install https://github.com/Deivu/Kearsarge.git --save`
 
 ### Example usages
 
@@ -113,3 +116,24 @@ manager.on(WebSocketShardEvents.Dispatch, (event) => console.log(event));
 
 await manager.connect();
 ```
+
+> Use of different encoding with compression
+```js
+import { KearsargeWorkerStrategy, WebsocketEncoding } from 'kearsarge';
+import { CompressionMethod, WebSocketManager, WebSocketShardEvents } from '@discordjs/ws';
+import { REST } from '@discordjs/rest';
+
+const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+const manager = new WebSocketManager({
+    // @ts-expect-error: overrides the type of discord.js encodings
+    encoding: WebsocketEncoding.ETF,
+    compression: CompressionMethod.ZlibStream,
+    intents: 0,
+    buildStrategy: (manager) => new KearsargeWorkerStrategy(manager, { shardsPerWorker: 2 }),
+    rest
+});
+```
+
+### Reminder
+
+* If you have custom strategies or bootstrappers, changing the WebsocketShard class to Kearsarge's websocket class will work. You don\'t need to use any of my strategies if you have your own
