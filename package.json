@@ -1,6 +1,6 @@
 {
   "name": "kearsarge",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "An alternative set of strategies for @discordjs/ws using CloudStorm",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
