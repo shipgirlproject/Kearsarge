@@ -8,23 +8,23 @@ import { URLSearchParams } from 'node:url';
 import {
     GatewayCloseCodes,
     GatewayDispatchEvents,
-    GatewayOpcodes,
     type GatewayIdentifyData,
+    GatewayOpcodes,
     type GatewayReceivePayload,
     type GatewaySendPayload
 } from 'discord-api-types/v10';
 import {
-    ImportantGatewayOpcodes,
-    IContextFetchingStrategy,
-    SessionInfo,
-    WebSocketShardEvents,
-    WebSocketShardStatus,
-    WebSocketShardDestroyRecovery,
-    WebSocketShardEventsMap,
-    WebSocketShardDestroyOptions,
     CloseCodes,
+    getInitialSendRateLimitState,
+    IContextFetchingStrategy,
+    ImportantGatewayOpcodes,
     SendRateLimitState,
-    getInitialSendRateLimitState
+    SessionInfo,
+    WebSocketShardDestroyOptions,
+    WebSocketShardDestroyRecovery,
+    WebSocketShardEvents,
+    WebSocketShardEventsMap,
+    WebSocketShardStatus
 } from '@discordjs/ws';
 import { Collection } from '@discordjs/collection';
 import { AsyncQueue } from '@sapphire/async-queue';
@@ -41,15 +41,16 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     public readonly id: number;
     public readonly strategy: IContextFetchingStrategy;
     private readonly connection: Websocket;
-    private replayedEvents = 0;
-    private isAck = true;
-    private sendRateLimitState: SendRateLimitState = getInitialSendRateLimitState();
-    private initialHeartbeatTimeoutController: AbortController | null = null;
-    private heartbeatInterval: NodeJS.Timer | null = null;
-    private lastHeartbeatAt = -1;
-    private readonly sendQueue = new AsyncQueue();
-    private readonly timeoutAbortControllers = new Collection<WebSocketShardEvents, AbortController>();
-    private _status: WebSocketShardStatus = WebSocketShardStatus.Idle;
+    private replayedEvents: number;
+    private isAck: boolean;
+    private sendRateLimitState: SendRateLimitState;
+    private initialHeartbeatTimeoutController: AbortController | null;
+    private heartbeatInterval: NodeJS.Timer | null;
+    private lastHeartbeatAt: number;
+    private readonly sendQueue: AsyncQueue;
+    private readonly timeoutAbortControllers: Collection<WebSocketShardEvents, AbortController>;
+    private _status: WebSocketShardStatus;
+    private _closing: boolean;
 
     public get status(): WebSocketShardStatus {
         return this._status;
@@ -64,6 +65,16 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
             .on(WebsocketEvents.MESSAGE, payload => this.onMessage(payload))
             .on(WebsocketEvents.ERROR, error => this.onError(error))
             .on(WebsocketEvents.DEBUG, message => this.debug([ 'Internal Websocket Class Message', message ]));
+        this.replayedEvents = 0;
+        this.isAck = true;
+        this.sendRateLimitState = getInitialSendRateLimitState();
+        this.initialHeartbeatTimeoutController = null;
+        this.heartbeatInterval = null;
+        this.lastHeartbeatAt = -1;
+        this.sendQueue = new AsyncQueue();
+        this.timeoutAbortControllers = new Collection();
+        this._status = WebSocketShardStatus.Idle;
+        this._closing = false;
     }
 
     public async connect(): Promise<void> {
@@ -125,7 +136,13 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         if (options.recover !== WebSocketShardDestroyRecovery.Resume) {
             await this.strategy.updateSessionInfo(this.id, null);
         }
-        await this.connection.close(options.code, options.reason || 'none');
+        try {
+            // seems connection on close is emitting when this is called, hence we need to ensure this._onClose will not execute
+            this._closing = true;
+            await this.connection.close(options.code, options.reason || 'none');
+        } finally {
+            this._closing = false;
+        }
         this._status = WebSocketShardStatus.Idle;
         if (options.recover !== undefined) {
             // There's cases (like no internet connection) where we immediately fail to connect,
@@ -411,6 +428,9 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     }
 
     private async onClose(code: number): Promise<void> {
+        // do not do anything if we are closing
+        if (this._closing) return;
+        // do not also emit shard events closed when we are closing
         this.emit(WebSocketShardEvents.Closed, { code });
         switch (code) {
             case CloseCodes.Normal: {
