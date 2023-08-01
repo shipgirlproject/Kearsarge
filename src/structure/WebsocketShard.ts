@@ -96,7 +96,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         try {
             this._status = WebSocketShardStatus.Connecting;
             await this.connection.connect({
-                address: address,
+                address,
                 encoding: encoding === 'json' ? WebsocketEncoding.JSON : WebsocketEncoding.ETF,
                 compress: !!compression
             });
