@@ -40,17 +40,17 @@ const recoverableErrorsRegex = /(?:EAI_AGAIN)|(?:ECONNRESET)/;
 export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
     public readonly id: number;
     public readonly strategy: IContextFetchingStrategy;
-    private readonly connection: Websocket;
     private replayedEvents: number;
     private isAck: boolean;
     private sendRateLimitState: SendRateLimitState;
     private initialHeartbeatTimeoutController: AbortController | null;
     private heartbeatInterval: NodeJS.Timer | null;
     private lastHeartbeatAt: number;
-    private readonly sendQueue: AsyncQueue;
-    private readonly timeoutAbortControllers: Collection<WebSocketShardEvents, AbortController>;
     private _status: WebSocketShardStatus;
     private _closing: boolean;
+    private readonly sendQueue: AsyncQueue;
+    private readonly timeoutAbortControllers: Collection<WebSocketShardEvents, AbortController>;
+    private readonly connection: Websocket;
 
     public get status(): WebSocketShardStatus {
         return this._status;
@@ -60,21 +60,22 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         super();
         this.id = id;
         this.strategy = strategy;
-        this.connection = new Websocket()
-            .on(WebsocketEvents.CLOSE, number => this.onClose(number))
-            .on(WebsocketEvents.MESSAGE, payload => this.onMessage(payload))
-            .on(WebsocketEvents.ERROR, error => this.onError(error))
-            .on(WebsocketEvents.DEBUG, message => this.debug([ 'Internal Websocket Class Message', message ]));
+
         this.replayedEvents = 0;
         this.isAck = true;
         this.sendRateLimitState = getInitialSendRateLimitState();
         this.initialHeartbeatTimeoutController = null;
         this.heartbeatInterval = null;
         this.lastHeartbeatAt = -1;
-        this.sendQueue = new AsyncQueue();
-        this.timeoutAbortControllers = new Collection();
         this._status = WebSocketShardStatus.Idle;
         this._closing = false;
+        this.sendQueue = new AsyncQueue();
+        this.timeoutAbortControllers = new Collection();
+        this.connection = new Websocket()
+            .on(WebsocketEvents.CLOSE, number => this.onEvent(WebsocketEvents.CLOSE, number))
+            .on(WebsocketEvents.MESSAGE, payload => this.onEvent(WebsocketEvents.MESSAGE, payload))
+            .on(WebsocketEvents.ERROR, error => this.onError(error))
+            .on(WebsocketEvents.DEBUG, message => this.debug([ 'Internal Websocket Class Message', message ]));
     }
 
     public async connect(): Promise<void> {
@@ -423,14 +424,7 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
         }
     }
 
-    private onError(error: Error): void {
-        this.emit(WebSocketShardEvents.Error, { error });
-    }
-
     private async onClose(code: number): Promise<void> {
-        // do not do anything if we are closing
-        if (this._closing) return;
-        // do not also emit shard events closed when we are closing
         this.emit(WebSocketShardEvents.Closed, { code });
         switch (code) {
             case CloseCodes.Normal: {
@@ -536,6 +530,24 @@ export class WebsocketShard extends AsyncEventEmitter<WebSocketShardEventsMap> {
                 });
             }
         }
+    }
+
+    private onEvent(event: WebsocketEvents, payload: unknown): Promise<void> {
+        if (this._closing)
+            return Promise.resolve(void 0);
+        // if the websocket shard is closing, do not execute any of this events
+        switch(event) {
+            case WebsocketEvents.CLOSE:
+                return this.onClose(payload as number);
+            case WebsocketEvents.MESSAGE:
+                return this.onMessage(payload as GatewayReceivePayload);
+            default:
+                return Promise.resolve(void 0);
+        }
+    }
+
+    private onError(error: Error): void {
+        this.emit(WebSocketShardEvents.Error, { error });
     }
 
     private debug(messages: [string, ...string[]]): void {
